@@ -613,6 +613,16 @@ private:
         delete[] arg;
     }
 
+    class custom_binary_comp : public pmem::kv::comparator {
+        int compare(pmem::kv::string_view key1, pmem::kv::string_view key2) override {
+            return key1.compare(key2);
+        }
+
+        std::string name() override {
+            return "custom_binary_comp";
+        }
+    };
+
 	void Open(bool fresh_db) {
 		assert(kv_ == NULL);
 		auto start = g_env->NowMicros();
@@ -636,6 +646,12 @@ private:
 				throw std::runtime_error(
 					"putting 'size' to config failed");
 		}
+
+        auto cmp = std::unique_ptr<custom_binary_comp>(new custom_binary_comp());
+        cfg_s = cfg.put_comparator(std::move(cmp));
+        if (cfg_s != pmem::kv::status::OK)
+			throw std::runtime_error(
+				"putting 'comparator' to config failed");
 
 		kv_ = new pmem::kv::db;
 		auto s = kv_->open(FLAGS_engine, std::move(cfg));
