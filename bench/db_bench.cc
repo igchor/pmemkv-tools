@@ -93,6 +93,12 @@ static const int FLAGS_duration = 0;
 
 static int FLAGS_readwritepercent = 90;
 
+int compare(const char *k1, size_t kb1, const char *k2, size_t kb2, void *arg)
+{
+    (void)arg;
+    return pmem::kv::string_view(k1, kb1).compare(pmem::kv::string_view(k2, kb2));
+}
+
 using namespace leveldb;
 
 leveldb::Env *g_env = NULL;
@@ -613,16 +619,6 @@ private:
         delete[] arg;
     }
 
-    class custom_binary_comp : public pmem::kv::comparator {
-        int compare(pmem::kv::string_view key1, pmem::kv::string_view key2) override {
-            return key1.compare(key2);
-        }
-
-        std::string name() override {
-            return "custom_binary_comp";
-        }
-    };
-
 	void Open(bool fresh_db) {
 		assert(kv_ == NULL);
 		auto start = g_env->NowMicros();
@@ -647,11 +643,17 @@ private:
 					"putting 'size' to config failed");
 		}
 
-        auto cmp = std::unique_ptr<custom_binary_comp>(new custom_binary_comp());
-        cfg_s = cfg.put_comparator(std::move(cmp));
-        if (cfg_s != pmem::kv::status::OK)
-			throw std::runtime_error(
-				"putting 'comparator' to config failed");
+        auto cmp = pmemkv_comparator_new(nullptr);
+        int r = pmemkv_comparator_set_function(cmp, compare);
+        if (r != PMEMKV_STATUS_OK)
+				throw std::runtime_error(
+					"pemmkv_comparator_set_function");
+        r = pmemkv_comparator_set_name(cmp, "compare");
+        if (r != PMEMKV_STATUS_OK)
+				throw std::runtime_error(
+					"pemmkv_comparator_set_name");
+        
+        cfg.put_object("comparator", cmp, (void (*)(void*)) pmemkv_comparator_delete);
 
 		kv_ = new pmem::kv::db;
 		auto s = kv_->open(FLAGS_engine, std::move(cfg));
