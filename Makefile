@@ -1,5 +1,29 @@
 .ONESHELL:
 
+install_deps:
+	rm -rf deps
+	mkdir deps
+	cd deps
+	git clone https://github.com/${USER}/libpmemobj-cpp
+	cd libpmemobj-cpp
+	git checkout ${BRANCH}
+	mkdir build
+	cd build
+	cmake .. -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=0 -DBUILD_EXAMPLES=0 -DBUILD_BENCHMARKS=0
+	make install
+	cd ../..
+	git clone https://github.com/${USER}/pmemkv
+	cd pmemkv
+	git checkout ${BRANCH}
+	mkdir build
+	cd build
+	PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${PREFIX}/lib/pkgconfig:${PREFIX}/lib64/pkgconfig cmake .. -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=0 -DBUILD_EXAMPLES=0 -DCXX_STANDARD=14 -DENGINE_RADIX=1 -DENGINE_STREE=1 -DENGINE_CSMAP=1
+	make install
+	cd ../../..
+
+compile_deps: install_deps
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${PMDK_PREFIX}/lib:${PMDK_PREFIX}/lib64 g++ ./bench/db_bench.cc ./bench/port/port_posix.cc ./bench/util/env.cc ./bench/util/env_posix.cc ./bench/util/histogram.cc ./bench/util/logging.cc ./bench/util/status.cc ./bench/util/testutil.cc -o pmemkv_bench -I./bench/include -I./bench -I./bench/util -I${PREFIX}/include -L${PREFIX}/lib -L${PREFIX}/lib64 -L${PMDK_PREFIX}/lib64 -L${PMDK_PREFIX}/lib -I${PMDK_PREFIX}/include -O2 -std=c++11 -DOS_LINUX -fno-builtin-memcmp -march=native -DNDEBUG -ldl -lpthread -lpmemkv
+
 reset:
 	rm -rf /dev/shm/pmemkv /tmp/pmemkv
 
