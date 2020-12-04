@@ -668,8 +668,8 @@ private:
             snprintf(msg, sizeof(msg), "(%d ops)", num_);
             thread->stats.AddMessage(msg);
         }
-        std::unique_ptr<const char[]> key_guard;
-        Slice key = AllocateKey(key_guard);
+        // std::unique_ptr<const char[]> key_guard;
+        // Slice key = AllocateKey(key_guard);
 
         auto num = FLAGS_disjoint ? num_ / FLAGS_threads : reads_;
         auto start = FLAGS_disjoint ? thread->tid * num_ : 0;
@@ -679,10 +679,12 @@ private:
         int64_t bytes = 0;
         for (int i = start; i < end; i++) {
             const int k = seq ? i : (thread->rand.Next() % num) + start;
-            GenerateKeyFromInt(k, FLAGS_num, &key);
+            //GenerateKeyFromInt(k, FLAGS_num, &key);
+            size_t kk = k;
+            pmem::kv::string_view key((const char*)&kk, 8);
             std::string value = std::string();
             value.append(value_size_, 'X');
-            s = kv_->put(key.ToString(), value);
+            s = kv_->put(key, value);
             bytes += value_size_ + key.size();
             thread->stats.FinishedSingleOp();
             if (s != pmem::kv::status::OK) {
@@ -705,8 +707,8 @@ private:
         pmem::kv::status s;
         int64_t bytes = 0;
         int found = 0;
-        std::unique_ptr<const char[]> key_guard;
-        Slice key = AllocateKey(key_guard);
+        // std::unique_ptr<const char[]> key_guard;
+        // Slice key = AllocateKey(key_guard);
 
         auto num = FLAGS_disjoint ? reads_ / FLAGS_threads : reads_;
         auto start = FLAGS_disjoint ? thread->tid * num : 0;
@@ -714,9 +716,11 @@ private:
 
         for (int i = start; i < end; i++) {
             const int k = seq ? i : (thread->rand.Next() % num) + start;
-            GenerateKeyFromInt(k, FLAGS_num, &key, missing);
+            //GenerateKeyFromInt(k, FLAGS_num, &key, missing);
+            size_t kk = k;
+            pmem::kv::string_view key((const char*)&kk, 8);
             std::string value;
-            if (kv_->get(key.ToString(), &value) == pmem::kv::status::OK) found++;
+            if (kv_->get(key, &value) == pmem::kv::status::OK) found++;
             thread->stats.FinishedSingleOp();
             bytes += value.length() + key.size();
         }
